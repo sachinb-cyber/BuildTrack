@@ -1,66 +1,82 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import styles from './page.module.css';
 
-export default function Home() {
+export default function Root() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const [progress, setProgress] = useState(0);
+  const [ready, setReady] = useState(false);
+  const [isEntering, setIsEntering] = useState(false);
+
+  useEffect(() => {
+    // Simulate loading environment
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setReady(true);
+          return 100;
+        }
+        return prev + Math.floor(Math.random() * 15) + 5;
+      });
+    }, 150);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleEnterWorkspace = () => {
+    setIsEntering(true);
+    setTimeout(() => {
+      router.replace(user ? '/dashboard' : '/login');
+    }, 800);
+  };
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.js file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className={`${styles.splashContainer} ${isEntering ? styles.fadeScaleOut : ''}`}>
+      <div className={styles.splashContent}>
+        {/* Animated Brand Concept */}
+        <div className={styles.brandIconWrapper}>
+          <div className={styles.brandIconRing1}></div>
+          <div className={styles.brandIconRing2}></div>
+          <div className={styles.brandIconCenter}></div>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        
+        <h1 className={styles.splashTitle}>Samarth OS</h1>
+        <p className={styles.splashSubtitle}>Enterprise Management Suite</p>
+
+        <div className={styles.loadingSection}>
+          {!ready ? (
+            <div className={styles.progressWrapper}>
+              <div 
+                className={styles.progressBar} 
+                style={{ width: `${progress}%` }}
+              ></div>
+              <div className={styles.progressStatus}>
+                <span>Initializing Environment...</span>
+                <span>{progress}%</span>
+              </div>
+            </div>
+          ) : (
+            <button 
+              className={styles.enterButton}
+              onClick={handleEnterWorkspace}
+              disabled={authLoading}
+            >
+              <span>{authLoading ? 'Authenticating...' : 'Enter Workspace'}</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14"></path>
+                <path d="m12 5 7 7-7 7"></path>
+              </svg>
+            </button>
+          )}
         </div>
-      </main>
+      </div>
+      
+      {/* Structural Ambient Background */}
+      <div className={styles.ambientLight}></div>
     </div>
   );
 }
