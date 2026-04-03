@@ -27,7 +27,32 @@ export async function PUT(req, { params }) {
   if (!authorize(user, 'admin', 'engineer')) return forbidden();
   await connectDB();
   try {
-    const project = await Project.findByIdAndUpdate(params.id, await req.json(), { new: true, runValidators: true });
+    const body = await req.json();
+
+    // Handle phase add/update
+    if (body._addPhase) {
+      const project = await Project.findById(params.id);
+      if (!project) return Response.json({ message: 'Project not found' }, { status: 404 });
+      const { name, status, startDate, endDate, budget, description } = body._addPhase;
+      const exists = project.phases.find(p => p.name === name);
+      if (exists) return Response.json({ message: 'Phase already exists' }, { status: 400 });
+      project.phases.push({ name, status, startDate, endDate, budget: budget || 0, description });
+      await project.save();
+      return Response.json(project);
+    }
+
+    if (body._updatePhase) {
+      const { phaseId, ...updates } = body._updatePhase;
+      const project = await Project.findById(params.id);
+      if (!project) return Response.json({ message: 'Project not found' }, { status: 404 });
+      const phase = project.phases.id(phaseId);
+      if (!phase) return Response.json({ message: 'Phase not found' }, { status: 404 });
+      Object.assign(phase, updates);
+      await project.save();
+      return Response.json(project);
+    }
+
+    const project = await Project.findByIdAndUpdate(params.id, body, { new: true, runValidators: true });
     if (!project) return Response.json({ message: 'Project not found' }, { status: 404 });
     return Response.json(project);
   } catch (e) {

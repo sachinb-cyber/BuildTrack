@@ -6,6 +6,7 @@ import Material from '@/models/Material';
 import Invoice from '@/models/Invoice';
 import Expense from '@/models/Expense';
 import Project from '@/models/Project';
+import Delivery from '@/models/Delivery';
 
 export async function GET(req) {
   const user = await verifyAuth(req);
@@ -52,7 +53,24 @@ export async function GET(req) {
     const totalBudget = projects.reduce((s, p) => s + p.budget, 0);
     const totalSpent = projects.reduce((s, p) => s + p.spent, 0);
 
+    // Cost overrun alerts
+    const overrunProjects = projects
+      .filter(p => p.budget > 0)
+      .map(p => ({
+        _id: p._id,
+        name: p.name,
+        budget: p.budget,
+        spent: p.spent,
+        pct: Math.round((p.spent / p.budget) * 100),
+        status: p.status,
+      }))
+      .filter(p => p.pct >= 80)
+      .sort((a, b) => b.pct - a.pct);
+
     const recentExpenses = await Expense.find().populate('project', 'name').sort('-date').limit(10);
+
+    // Pending deliveries count
+    const pendingDeliveries = await Delivery.countDocuments({ status: 'pending' });
 
     return Response.json({
       workers: { total: workers.length, totalPayments: totalWorkerPayments, pendingPayments: pendingWorkerPayments },
@@ -61,6 +79,8 @@ export async function GET(req) {
       invoices: { total: invoices.length, pendingCount: pendingInvoices.length, totalAmount: totalInvoiceAmount, pendingAmount: pendingInvoiceAmount },
       expenses: { total: totalExpenses, byCategory: expenseByCategory, monthly: monthlyExpenses },
       projects: { total: projects.length, active: activeProjects.length, totalBudget, totalSpent },
+      overrunProjects,
+      pendingDeliveries,
       pendingTotal: pendingWorkerPayments + pendingStaffSalary + pendingInvoiceAmount,
       recentExpenses
     });

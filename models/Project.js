@@ -1,5 +1,15 @@
 import mongoose from 'mongoose';
 
+const phaseSchema = new mongoose.Schema({
+  name: { type: String, enum: ['Foundation', 'Structure', 'Finishing', 'Handover'], required: true },
+  status: { type: String, enum: ['pending', 'active', 'completed'], default: 'pending' },
+  startDate: { type: Date },
+  endDate: { type: Date },
+  budget: { type: Number, default: 0 },
+  spent: { type: Number, default: 0 },
+  description: { type: String },
+}, { timestamps: true });
+
 const projectSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   location: { type: String, required: true },
@@ -13,7 +23,8 @@ const projectSchema = new mongoose.Schema({
   description: { type: String },
   manager: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   workers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }],
-  staff: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Staff' }]
+  staff: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Staff' }],
+  phases: [phaseSchema],
 }, { timestamps: true });
 
 projectSchema.virtual('budgetUsedPercent').get(function () {

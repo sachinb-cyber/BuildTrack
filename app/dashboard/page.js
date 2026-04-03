@@ -22,11 +22,46 @@ export default function Dashboard() {
     amount: formatCurrency(e.amount), date: formatDate(e.date), project: e.project?.name || '—',
   }));
 
+  const criticalOverrun = (data.overrunProjects || []).filter(p => p.pct >= 100);
+  const warningOverrun  = (data.overrunProjects || []).filter(p => p.pct >= 80 && p.pct < 100);
+
   return (
     <Layout>
       <Page title="Dashboard" subtitle="Real-time overview of all operations">
 
-        {/* Alerts */}
+        {/* Cost Overrun Alerts */}
+        {criticalOverrun.length > 0 && (
+          <div style={{ background:'rgba(232,74,95,0.08)', border:'1px solid rgba(232,74,95,0.3)', borderRadius:'var(--radius)', padding:'14px 18px', marginBottom:16, display:'flex', alignItems:'flex-start', gap:12 }}>
+            <span style={{ fontSize:20 }}>🚨</span>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:700, color:'var(--red)', fontSize:14, marginBottom:6 }}>Budget Overrun — {criticalOverrun.length} project{criticalOverrun.length > 1 ? 's' : ''} exceeded budget</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                {criticalOverrun.map(p => (
+                  <span key={p._id} style={{ fontSize:12, background:'rgba(232,74,95,0.12)', border:'1px solid rgba(232,74,95,0.25)', padding:'3px 10px', borderRadius:20, color:'var(--red)', fontWeight:600 }}>
+                    {p.name} — {p.pct}%
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        {warningOverrun.length > 0 && (
+          <div style={{ background:'rgba(226,183,20,0.08)', border:'1px solid rgba(226,183,20,0.3)', borderRadius:'var(--radius)', padding:'14px 18px', marginBottom:16, display:'flex', alignItems:'flex-start', gap:12 }}>
+            <span style={{ fontSize:20 }}>⚠️</span>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:700, color:'var(--yellow)', fontSize:14, marginBottom:6 }}>Budget Warning — {warningOverrun.length} project{warningOverrun.length > 1 ? 's' : ''} above 80%</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                {warningOverrun.map(p => (
+                  <span key={p._id} style={{ fontSize:12, background:'rgba(226,183,20,0.12)', border:'1px solid rgba(226,183,20,0.25)', padding:'3px 10px', borderRadius:20, color:'var(--yellow)', fontWeight:600 }}>
+                    {p.name} — {p.pct}%
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Inventory / Invoice Alerts */}
         {(data.inventory?.lowStockCount > 0 || data.invoices?.pendingCount > 0) && (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))', gap:12, marginBottom:24 }}>
             {data.inventory?.lowStockCount > 0 && <AlertCard type="warning" title={`${data.inventory.lowStockCount} Low Stock Items`} items={data.inventory.lowStockItems?.map(i => `${i.name}: ${i.currentStock} ${i.unit} (min: ${i.minStock})`)}/>}
@@ -45,7 +80,7 @@ export default function Dashboard() {
           <StatCard title="Active Workers" value={data.workers?.total} icon="👷" color="var(--yellow)" delay={1}/>
           <StatCard title="Staff Members" value={data.staff?.total} sub={`Pending: ${formatCurrency(data.staff?.pendingSalary)}`} icon="👨‍💼" color="var(--purple)" delay={2}/>
           <StatCard title="Pending Invoices" value={data.invoices?.pendingCount} sub={formatCurrency(data.invoices?.pendingAmount)} icon="🧾" color="var(--red)" delay={3}/>
-          <StatCard title="Budget Utilization" value={`${data.projects?.totalBudget > 0 ? Math.round((data.projects.totalSpent / data.projects.totalBudget) * 100) : 0}%`} sub={`${formatCurrency(data.projects?.totalSpent)} of ${formatCurrency(data.projects?.totalBudget)}`} icon="📈" color="var(--cyan)" delay={4}/>
+          <StatCard title="Pending Deliveries" value={data.pendingDeliveries || 0} sub="Awaiting arrival" icon="🚚" color="var(--cyan)" delay={4}/>
         </div>
 
         <div className="grid-2" style={{ marginBottom:20 }}>
@@ -88,13 +123,24 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
+            {/* Project overrun list */}
+            {(data.overrunProjects||[]).length > 0 && (
+              <div style={{ marginTop:8, borderTop:'1px solid var(--border)', paddingTop:12 }}>
+                <div style={{ fontSize:11, fontWeight:600, color:'var(--text-muted)', textTransform:'uppercase', marginBottom:8 }}>Budget Status by Project</div>
+                {data.overrunProjects.map(p => (
+                  <div key={p._id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                    <span style={{ fontSize:12, color:'var(--text-secondary)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:8 }}>{p.name}</span>
+                    <span style={{ fontSize:12, fontWeight:700, fontFamily:'var(--mono)', color: p.pct >= 100 ? 'var(--red)' : p.pct >= 80 ? 'var(--yellow)' : 'var(--green)', flexShrink:0 }}>{p.pct}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:4 }}>
               {data.projects?.totalBudget > 0 ? `${Math.round((data.projects.totalSpent/data.projects.totalBudget)*100)}% utilized` : 'No budget set'}
             </div>
           </Card>
         </div>
 
-        {/* Recent Expenses */}
         <Card title="Recent Expenses" className="animate-in delay-6" noPad>
           <DataTable
             columns={[

@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 
 const categories = ['cement','steel','sand','aggregate','bricks','wood','paint','electrical','plumbing','hardware','tiles','other'];
 const units = ['kg','bags','pieces','meters','sqft','cft','liters','tons','bundles'];
+const PHASES = ['', 'Foundation', 'Structure', 'Finishing', 'Handover'];
 
 export default function Inventory() {
   const { hasRole } = useAuth();
@@ -22,7 +23,7 @@ export default function Inventory() {
   const [filterCat, setFilterCat] = useState('');
   const [showLowOnly, setShowLowOnly] = useState(false);
   const [form, setForm] = useState({ name:'', category:'cement', unit:'bags', currentStock:'', minStock:10, unitPrice:'' });
-  const [stockForm, setStockForm] = useState({ type:'in', quantity:'', project:'', supplier:'', unitPrice:'', notes:'' });
+  const [stockForm, setStockForm] = useState({ type:'in', quantity:'', project:'', supplier:'', unitPrice:'', phase:'', notes:'' });
 
   const fetchData = useCallback(async () => {
     try {
@@ -47,7 +48,14 @@ export default function Inventory() {
   const handleStock = async (e) => {
     e.preventDefault();
     try {
-      await api.post(`/inventory/${showStock._id}/stock`, { ...stockForm, quantity:Number(stockForm.quantity), unitPrice:stockForm.unitPrice?Number(stockForm.unitPrice):undefined, project:stockForm.project||undefined, supplier:stockForm.supplier||undefined });
+      await api.post(`/inventory/${showStock._id}/stock`, {
+        ...stockForm,
+        quantity: Number(stockForm.quantity),
+        unitPrice: stockForm.unitPrice ? Number(stockForm.unitPrice) : undefined,
+        project: stockForm.project || undefined,
+        supplier: stockForm.supplier || undefined,
+        phase: stockForm.phase || undefined,
+      });
       toast.success(`Stock ${stockForm.type==='in'?'added':'removed'}`); setShowStock(null); fetchData();
     } catch(e){ toast.error(e.response?.data?.message||'Error'); }
   };
@@ -111,8 +119,8 @@ export default function Inventory() {
                     <div style={{ width:`${pct}%`, height:'100%', borderRadius:3, background:statusColor, transition:'width 0.6s ease' }}/>
                   </div>
                   <div style={{ display:'flex', gap:8 }}>
-                    <Btn variant="success" size="sm" style={{flex:1}} onClick={()=>{ setShowStock(m); setStockForm({type:'in',quantity:'',project:'',supplier:'',unitPrice:'',notes:''}); }}>↓ IN</Btn>
-                    <Btn variant="danger"  size="sm" style={{flex:1}} onClick={()=>{ setShowStock(m); setStockForm({type:'out',quantity:'',project:'',supplier:'',unitPrice:'',notes:''}); }}>↑ OUT</Btn>
+                    <Btn variant="success" size="sm" style={{flex:1}} onClick={()=>{ setShowStock(m); setStockForm({type:'in',quantity:'',project:'',supplier:'',unitPrice:'',phase:'',notes:''}); }}>↓ IN</Btn>
+                    <Btn variant="danger"  size="sm" style={{flex:1}} onClick={()=>{ setShowStock(m); setStockForm({type:'out',quantity:'',project:'',supplier:'',unitPrice:'',phase:'',notes:''}); }}>↑ OUT</Btn>
                     <Btn variant="ghost"   size="sm" onClick={()=>setShowLogs(m)}>📋</Btn>
                   </div>
                 </div>
@@ -121,6 +129,7 @@ export default function Inventory() {
           </div>
         )}
 
+        {/* Add Material Modal */}
         <Modal isOpen={showAdd} onClose={()=>setShowAdd(false)} title="Add Material">
           <form onSubmit={handleAdd}>
             <Input label="Material Name" required value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g., OPC Cement 53 Grade" style={{marginBottom:16}}/>
@@ -140,6 +149,7 @@ export default function Inventory() {
           </form>
         </Modal>
 
+        {/* Stock In/Out Modal */}
         <Modal isOpen={!!showStock} onClose={()=>setShowStock(null)} title={`Stock ${stockForm.type==='in'?'IN':'OUT'} — ${showStock?.name}`}>
           <form onSubmit={handleStock}>
             <div style={{ display:'flex', gap:8, marginBottom:16 }}>
@@ -152,9 +162,14 @@ export default function Inventory() {
             <Input label={`Quantity (${showStock?.unit})`} type="number" required value={stockForm.quantity} onChange={e=>setStockForm(f=>({...f,quantity:e.target.value}))} style={{marginBottom:16}}/>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
               <Select label="Project" value={stockForm.project} onChange={e=>setStockForm(f=>({...f,project:e.target.value}))} options={[{value:'',label:'None'},...projects.map(p=>({value:p._id,label:p.name}))]}/>
-              {stockForm.type==='in'&&<Select label="Supplier" value={stockForm.supplier} onChange={e=>setStockForm(f=>({...f,supplier:e.target.value}))} options={[{value:'',label:'None'},...suppliers.map(s=>({value:s._id,label:s.name}))]}/>}
+              <Select label="Project Phase" value={stockForm.phase} onChange={e=>setStockForm(f=>({...f,phase:e.target.value}))} options={PHASES.map(ph=>({value:ph,label:ph||'None'}))}/>
             </div>
-            {stockForm.type==='in'&&<Input label="Unit Price (₹)" type="number" value={stockForm.unitPrice} onChange={e=>setStockForm(f=>({...f,unitPrice:e.target.value}))} style={{marginBottom:16}}/>}
+            {stockForm.type==='in'&&(
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
+                <Select label="Supplier" value={stockForm.supplier} onChange={e=>setStockForm(f=>({...f,supplier:e.target.value}))} options={[{value:'',label:'None'},...suppliers.map(s=>({value:s._id,label:s.name}))]}/>
+                <Input label="Unit Price (₹)" type="number" value={stockForm.unitPrice} onChange={e=>setStockForm(f=>({...f,unitPrice:e.target.value}))}/>
+              </div>
+            )}
             <Input label="Notes" value={stockForm.notes} onChange={e=>setStockForm(f=>({...f,notes:e.target.value}))} style={{marginBottom:24}}/>
             <div style={{display:'flex',justifyContent:'flex-end',gap:10}}>
               <Btn variant="secondary" onClick={()=>setShowStock(null)}>Cancel</Btn>
@@ -163,16 +178,20 @@ export default function Inventory() {
           </form>
         </Modal>
 
+        {/* Stock Log Modal */}
         <Modal isOpen={!!showLogs} onClose={()=>setShowLogs(null)} title={`Stock Log — ${showLogs?.name}`} size="lg">
           {showLogs?.stockLog?.length===0 ? <p style={{color:'var(--text-muted)',fontSize:13}}>No stock movements recorded.</p> : (
             <DataTable
               columns={[
-                { key:'type',     label:'Type',  render:v=><Badge status={v==='in'?'active':'overdue'}/> },
-                { key:'quantity', label:'Qty',   render:(v,r)=><span style={{fontFamily:'var(--mono)'}}>{v} {showLogs?.unit}</span> },
-                { key:'unitPrice',label:'Price', render:v=><span style={{fontFamily:'var(--mono)'}}>{formatCurrency(v)}</span> },
-                { key:'totalCost',label:'Total', render:v=><span style={{fontFamily:'var(--mono)',fontWeight:600}}>{formatCurrency(v)}</span> },
-                { key:'date',     label:'Date',  render:v=>formatDate(v) },
-                { key:'notes',    label:'Notes', render:v=>v||'—' },
+                { key:'type',        label:'Type',     render:v=><Badge status={v==='in'?'active':'overdue'}/> },
+                { key:'quantity',    label:'Qty',      render:(v,r)=><span style={{fontFamily:'var(--mono)'}}>{v} {showLogs?.unit}</span> },
+                { key:'phase',       label:'Phase',    render:v=>v?<span style={{fontSize:12,color:'var(--accent-light)',fontWeight:600}}>{v}</span>:<span style={{color:'var(--text-muted)'}}>—</span> },
+                { key:'projectName', label:'Project',  render:v=>v||<span style={{color:'var(--text-muted)'}}>—</span> },
+                { key:'supplierName',label:'Supplier', render:v=>v||<span style={{color:'var(--text-muted)'}}>—</span> },
+                { key:'unitPrice',   label:'Price',    render:v=><span style={{fontFamily:'var(--mono)'}}>{formatCurrency(v)}</span> },
+                { key:'totalCost',   label:'Total',    render:v=><span style={{fontFamily:'var(--mono)',fontWeight:600}}>{formatCurrency(v)}</span> },
+                { key:'date',        label:'Date',     render:v=>formatDate(v) },
+                { key:'notes',       label:'Notes',    render:v=>v||'—' },
               ]}
               data={(showLogs?.stockLog||[]).slice().reverse()}
             />
