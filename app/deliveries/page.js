@@ -170,12 +170,24 @@ export default function Deliveries() {
     if (!confirmDelivery) stopCamera();
   }, [confirmDelivery, camStep]);
 
-  /* ── Capture photo with watermark ── */
+  /* ── Capture photo with watermark + compress to max 1280px ── */
   const capture = () => {
     if (!videoRef.current || !canvasRef.current || !cameraReady) return;
     if (!geo) { toast.error('Waiting for GPS location…'); return; }
     applyWatermark(canvasRef.current, videoRef.current, { geo, delivery: confirmDelivery, user });
-    setCapturedImg(canvasRef.current.toDataURL('image/jpeg', 0.88));
+    const src = canvasRef.current;
+    const MAX_W = 1280;
+    let dataUrl;
+    if (src.width > MAX_W) {
+      const scale = MAX_W / src.width;
+      const out = document.createElement('canvas');
+      out.width = MAX_W; out.height = Math.round(src.height * scale);
+      out.getContext('2d').drawImage(src, 0, 0, out.width, out.height);
+      dataUrl = out.toDataURL('image/jpeg', 0.82);
+    } else {
+      dataUrl = src.toDataURL('image/jpeg', 0.82);
+    }
+    setCapturedImg(dataUrl);
     stopCamera();
     setCamStep('preview');
   };

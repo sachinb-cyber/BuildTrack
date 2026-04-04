@@ -22,6 +22,8 @@ const invoiceSchema = new mongoose.Schema({
   paidDate: { type: Date },
   paidAmount: { type: Number, default: 0 },
   notes: { type: String },
+  reconciled: { type: Boolean, default: false },
+  deliveryRef: { type: mongoose.Schema.Types.ObjectId, ref: 'Delivery', default: null },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 

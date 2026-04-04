@@ -3,9 +3,77 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Page, Card, StatCard, DataTable, Badge, AlertCard, Loading, MiniBarChart } from '@/components/UI';
 import { formatCurrency, formatDate, getMonthName } from '@/lib/helpers';
+import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 
+function EngineerDashboard({ data }) {
+  const ed = data.engineerData || {};
+  const statusColor = { pending:'var(--yellow)', delivered:'var(--green)', partial:'var(--accent)', cancelled:'var(--red)' };
+  const geoStatusColor = s => s === 'approved' ? 'var(--green)' : s === 'rejected' ? 'var(--red)' : 'var(--yellow)';
+
+  return (
+    <div>
+      {/* Stats row */}
+      <div className="grid-4" style={{ marginBottom:24 }}>
+        <StatCard title="My Pending Deliveries" value={ed.myPendingDeliveries?.length || 0} icon="🚚" color="var(--yellow)" delay={1}/>
+        <StatCard title="Photos Submitted" value={ed.myGeoCapturesCount || 0} icon="📷" color="var(--accent)" delay={2}/>
+        <StatCard title="Awaiting Approval" value={ed.pendingApprovals || 0} icon="⏳" color="var(--purple)" delay={3}/>
+        <StatCard title="Active Projects" value={data.projects?.active || 0} icon="🏗️" color="var(--green)" delay={4}/>
+      </div>
+
+      {/* Low stock alert for engineers */}
+      {data.inventory?.lowStockCount > 0 && (
+        <div style={{ background:'rgba(226,183,20,0.08)', border:'1px solid rgba(226,183,20,0.25)', borderRadius:'var(--radius)', padding:'12px 16px', marginBottom:20, display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:18 }}>⚠️</span>
+          <span style={{ fontSize:13, color:'var(--yellow)', fontWeight:600 }}>{data.inventory.lowStockCount} materials are low on stock — check inventory</span>
+        </div>
+      )}
+
+      <div className="grid-2" style={{ marginBottom:20 }}>
+        {/* My pending deliveries */}
+        <Card title="My Pending Deliveries">
+          {(ed.myPendingDeliveries || []).length === 0 ? (
+            <div style={{ textAlign:'center', padding:'24px 0', color:'var(--text-muted)', fontSize:13 }}>No pending deliveries</div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {ed.myPendingDeliveries.map(d => (
+                <div key={d._id} style={{ padding:'10px 14px', background:'var(--bg-elevated)', borderRadius:10, border:'1px solid var(--border)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                    <div style={{ fontWeight:600, fontSize:13, color:'var(--text)' }}>{d.supplier?.name || '—'}</div>
+                    <span style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', color:statusColor[d.status], background:`${statusColor[d.status]}18`, padding:'2px 8px', borderRadius:8 }}>{d.status}</span>
+                  </div>
+                  <div style={{ fontSize:12, color:'var(--text-muted)' }}>🏗️ {d.project?.name || '—'} · Due {formatDate(d.deliveryDate)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* My recent geo-captures */}
+        <Card title="My Recent Geo Photos">
+          {(ed.myRecentGeoCaptures || []).length === 0 ? (
+            <div style={{ textAlign:'center', padding:'24px 0', color:'var(--text-muted)', fontSize:13 }}>No photos uploaded yet</div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+              {ed.myRecentGeoCaptures.slice(0,6).map(g => (
+                <div key={g._id} style={{ borderRadius:8, overflow:'hidden', border:'1px solid var(--border)', position:'relative' }}>
+                  <img src={g.imageUrl || g.imageData} alt="geo" style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }}/>
+                  <div style={{ position:'absolute', bottom:0, left:0, right:0, padding:'4px 6px', background:'rgba(0,0,0,0.7)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>{g.projectName || '—'}</span>
+                    <span style={{ fontSize:9, fontWeight:700, color:geoStatusColor(g.status), textTransform:'uppercase' }}>{g.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -15,6 +83,16 @@ export default function Dashboard() {
 
   if (loading) return <Layout><Loading/></Layout>;
   if (!data) return <Layout><div style={{ color:'var(--red)', padding:20 }}>Failed to load dashboard</div></Layout>;
+
+  if (user?.role === 'engineer') {
+    return (
+      <Layout>
+        <Page title="My Dashboard" subtitle={`Welcome back, ${user.name?.split(' ')[0]}`}>
+          <EngineerDashboard data={data} />
+        </Page>
+      </Layout>
+    );
+  }
 
   const monthlyAmounts = data.expenses?.monthly?.map(m => m.total) || [];
   const expenseRows = (data.recentExpenses || []).map(e => ({

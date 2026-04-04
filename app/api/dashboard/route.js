@@ -7,6 +7,7 @@ import Invoice from '@/models/Invoice';
 import Expense from '@/models/Expense';
 import Project from '@/models/Project';
 import Delivery from '@/models/Delivery';
+import GeoCapture from '@/models/GeoCapture';
 
 export async function GET(req) {
   const user = await verifyAuth(req);
@@ -72,6 +73,28 @@ export async function GET(req) {
     // Pending deliveries count
     const pendingDeliveries = await Delivery.countDocuments({ status: 'pending' });
 
+    // Engineer-specific data
+    let engineerData = null;
+    if (user.role === 'engineer') {
+      const [myDeliveries, myGeoCaptures] = await Promise.all([
+        Delivery.find({ createdBy: user._id, status: 'pending' })
+          .populate('supplier', 'name')
+          .populate('project', 'name')
+          .sort('-createdAt')
+          .limit(10),
+        GeoCapture.find({ user: user._id })
+          .populate('project', 'name')
+          .sort('-createdAt')
+          .limit(6),
+      ]);
+      engineerData = {
+        myPendingDeliveries: myDeliveries,
+        myGeoCapturesCount: myGeoCaptures.length,
+        myRecentGeoCaptures: myGeoCaptures,
+        pendingApprovals: myGeoCaptures.filter(g => g.status === 'pending').length,
+      };
+    }
+
     return Response.json({
       workers: { total: workers.length, totalPayments: totalWorkerPayments, pendingPayments: pendingWorkerPayments },
       staff: { total: staffMembers.length, totalSalary: totalStaffSalary, pendingSalary: pendingStaffSalary },
@@ -82,7 +105,8 @@ export async function GET(req) {
       overrunProjects,
       pendingDeliveries,
       pendingTotal: pendingWorkerPayments + pendingStaffSalary + pendingInvoiceAmount,
-      recentExpenses
+      recentExpenses,
+      engineerData,
     });
   } catch (e) {
     return Response.json({ message: e.message }, { status: 500 });

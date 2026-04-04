@@ -23,6 +23,7 @@ const materialSchema = new mongoose.Schema({
   minStock: { type: Number, default: 10 },
   unitPrice: { type: Number, default: 0 },
   location: { type: String },
+  barcode: { type: String, default: '' },
   stockLog: [stockLogSchema]
 }, { timestamps: true });
 

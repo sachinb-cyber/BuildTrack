@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '@/components/Layout';
 import { Page, StatCard, DataTable, Badge, Btn, Input, Select, Modal, Loading, EmptyState } from '@/components/UI';
 import { formatCurrency, formatDate } from '@/lib/helpers';
@@ -22,8 +22,12 @@ export default function Inventory() {
   const [showLogs, setShowLogs] = useState(null);
   const [filterCat, setFilterCat] = useState('');
   const [showLowOnly, setShowLowOnly] = useState(false);
-  const [form, setForm] = useState({ name:'', category:'cement', unit:'bags', currentStock:'', minStock:10, unitPrice:'' });
+  const [form, setForm] = useState({ name:'', category:'cement', unit:'bags', currentStock:'', minStock:10, unitPrice:'', barcode:'' });
   const [stockForm, setStockForm] = useState({ type:'in', quantity:'', project:'', supplier:'', unitPrice:'', phase:'', notes:'' });
+  const [showScan, setShowScan] = useState(false);
+  const scanVideoRef = useRef(null);
+  const scanStreamRef = useRef(null);
+  const scanDetectorRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -37,10 +41,60 @@ export default function Inventory() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  /* ── QR / Barcode scan ── */
+  const openScan = useCallback(async () => {
+    if (!('BarcodeDetector' in window)) {
+      toast.error('Barcode scanning not supported in this browser. Try Chrome on Android.');
+      return;
+    }
+    setShowScan(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } }, audio: false,
+      });
+      scanStreamRef.current = stream;
+      if (scanVideoRef.current) {
+        scanVideoRef.current.srcObject = stream;
+        await scanVideoRef.current.play();
+      }
+      scanDetectorRef.current = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8', 'data_matrix'] });
+      const tick = async () => {
+        if (!scanStreamRef.current || !scanVideoRef.current) return;
+        try {
+          const codes = await scanDetectorRef.current.detect(scanVideoRef.current);
+          if (codes.length > 0) {
+            const code = codes[0].rawValue;
+            stopScan();
+            const found = materials.find(m => m.barcode === code);
+            if (found) {
+              toast.success(`Found: ${found.name}`);
+              setShowStock(found);
+              setStockForm({ type:'in', quantity:'', project:'', supplier:'', unitPrice:'', phase:'', notes:'' });
+            } else {
+              toast.error(`No material with barcode: ${code}`);
+            }
+            return;
+          }
+        } catch {}
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    } catch {
+      toast.error('Camera access denied');
+      setShowScan(false);
+    }
+  }, [materials]);
+
+  const stopScan = useCallback(() => {
+    scanStreamRef.current?.getTracks().forEach(t => t.stop());
+    scanStreamRef.current = null;
+    setShowScan(false);
+  }, []);
+
   const handleAdd = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/inventory', { ...form, currentStock:Number(form.currentStock), minStock:Number(form.minStock), unitPrice:Number(form.unitPrice) });
+      await api.post('/inventory', { ...form, currentStock:Number(form.currentStock), minStock:Number(form.minStock), unitPrice:Number(form.unitPrice), barcode:form.barcode||'' });
       toast.success('Material added'); setShowAdd(false); fetchData();
     } catch(e){ toast.error(e.response?.data?.message||'Error'); }
   };
@@ -68,7 +122,12 @@ export default function Inventory() {
   return (
     <Layout>
       <Page title="Inventory" subtitle={`${materials.length} materials · ${lowCount} low stock`}
-        actions={hasRole('admin','engineer')&&<Btn icon={<span style={{fontSize:16}}>+</span>} onClick={()=>setShowAdd(true)}>Add Material</Btn>}>
+        actions={hasRole('admin','engineer')&&(
+          <div style={{ display:'flex', gap:8 }}>
+            <Btn variant="secondary" onClick={openScan}>📷 Scan QR</Btn>
+            <Btn icon={<span style={{fontSize:16}}>+</span>} onClick={()=>setShowAdd(true)}>Add Material</Btn>
+          </div>
+        )}>
 
         <div className="grid-4" style={{ marginBottom:24 }}>
           <StatCard title="Total Materials"  value={materials.length}  icon="📦" color="var(--accent)"  delay={1}/>
@@ -138,6 +197,7 @@ export default function Inventory() {
               <Select label="Unit" value={form.unit} onChange={e=>setForm(f=>({...f,unit:e.target.value}))} options={units.map(u=>({value:u,label:u}))}/>
               <Input label="Unit Price (₹)" type="number" value={form.unitPrice} onChange={e=>setForm(f=>({...f,unitPrice:e.target.value}))}/>
             </div>
+            <Input label="Barcode / QR Code (optional)" value={form.barcode} onChange={e=>setForm(f=>({...f,barcode:e.target.value}))} placeholder="Scan or type barcode value" style={{marginBottom:16}}/>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:24}}>
               <Input label="Current Stock" type="number" required value={form.currentStock} onChange={e=>setForm(f=>({...f,currentStock:e.target.value}))}/>
               <Input label="Min Stock (Alert)" type="number" value={form.minStock} onChange={e=>setForm(f=>({...f,minStock:e.target.value}))}/>
@@ -176,6 +236,28 @@ export default function Inventory() {
               <Btn type="submit" variant={stockForm.type==='in'?'success':'danger'}>{stockForm.type==='in'?'↓ Add Stock':'↑ Remove Stock'}</Btn>
             </div>
           </form>
+        </Modal>
+
+        {/* QR / Barcode Scan Modal */}
+        <Modal isOpen={showScan} onClose={stopScan} title="Scan Barcode / QR Code">
+          <div style={{ textAlign:'center' }}>
+            <div style={{ position:'relative', background:'#000', borderRadius:12, overflow:'hidden', aspectRatio:'4/3', marginBottom:16 }}>
+              <video ref={scanVideoRef} autoPlay playsInline muted style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}/>
+              {/* Scan crosshair */}
+              <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
+                <div style={{ width:200, height:200, border:'3px solid rgba(59,130,246,0.8)', borderRadius:16, boxShadow:'0 0 0 9999px rgba(0,0,0,0.4)' }}>
+                  <div style={{ position:'absolute', top:0, left:0, width:30, height:30, borderTop:'4px solid #3b82f6', borderLeft:'4px solid #3b82f6', borderRadius:'12px 0 0 0' }}/>
+                  <div style={{ position:'absolute', top:0, right:0, width:30, height:30, borderTop:'4px solid #3b82f6', borderRight:'4px solid #3b82f6', borderRadius:'0 12px 0 0' }}/>
+                  <div style={{ position:'absolute', bottom:0, left:0, width:30, height:30, borderBottom:'4px solid #3b82f6', borderLeft:'4px solid #3b82f6', borderRadius:'0 0 0 12px' }}/>
+                  <div style={{ position:'absolute', bottom:0, right:0, width:30, height:30, borderBottom:'4px solid #3b82f6', borderRight:'4px solid #3b82f6', borderRadius:'0 0 12px 0' }}/>
+                </div>
+              </div>
+            </div>
+            <p style={{ fontSize:13, color:'var(--text-muted)', marginBottom:16 }}>
+              Point camera at a barcode or QR code on the material package
+            </p>
+            <Btn variant="secondary" onClick={stopScan}>Cancel</Btn>
+          </div>
         </Modal>
 
         {/* Stock Log Modal */}

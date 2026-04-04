@@ -9,11 +9,18 @@ export async function GET(req) {
   if (!user) return unauthorized();
   await connectDB();
   try {
-    const records = await GeoCapture.find()
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get('status');
+    const filter = {};
+    if (status) filter.status = status;
+    // Non-admins only see their own uploads
+    if (user.role !== 'admin') filter.user = user._id;
+
+    const records = await GeoCapture.find(filter)
       .populate('project', 'name location')
       .populate('user', 'name')
       .sort('-createdAt')
-      .limit(50);
+      .limit(100);
     return Response.json(records);
   } catch (e) {
     return Response.json({ message: e.message }, { status: 500 });

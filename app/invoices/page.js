@@ -116,6 +116,14 @@ function printInvoice(inv) {
   w.onload = () => { w.focus(); w.print(); };
 }
 
+function downloadCSV(rows, filename) {
+  const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  Object.assign(document.createElement('a'), { href: url, download: filename }).click();
+  URL.revokeObjectURL(url);
+}
+
 export default function Invoices() {
   const { hasRole } = useAuth();
   const [invoices, setInvoices] = useState([]);
@@ -177,7 +185,15 @@ export default function Invoices() {
   return (
     <Layout>
       <Page title="Invoices" subtitle={`${invoices.length} invoices`}
-        actions={hasRole('admin','accountant')&&<Btn icon={<span style={{fontSize:16}}>+</span>} onClick={()=>setShowAdd(true)}>Create Invoice</Btn>}>
+        actions={
+          <div style={{ display:'flex', gap:8 }}>
+            <Btn variant="secondary" onClick={()=>downloadCSV([
+              ['Invoice #','Type','Party','Amount','Status','Due Date','Created'],
+              ...invoices.map(i=>[i.invoiceNumber, i.type, i.supplier?.name||i.project?.name||'—', i.totalAmount, i.status, formatDate(i.dueDate), formatDate(i.createdAt)])
+            ], 'invoices.csv')}>⬇ CSV</Btn>
+            {hasRole('admin','accountant')&&<Btn icon={<span style={{fontSize:16}}>+</span>} onClick={()=>setShowAdd(true)}>Create Invoice</Btn>}
+          </div>
+        }>
 
         <div className="grid-4" style={{ marginBottom:24 }}>
           <StatCard title="Total Invoiced" value={formatCurrency(totalAmt)}   icon="🧾" color="var(--accent)"  delay={1}/>
@@ -197,7 +213,12 @@ export default function Invoices() {
           <Card className="animate-in delay-5" noPad>
             <DataTable
               columns={[
-                { key:'invoiceNumber', label:'Invoice #', render:v=><span style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--accent-light)'}}>{v}</span> },
+                { key:'invoiceNumber', label:'Invoice #', render:(v,r)=>(
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--accent-light)'}}>{v}</span>
+                    {r.reconciled&&<span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:10, background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.3)', color:'var(--accent-light)', whiteSpace:'nowrap' }}>🔄 Auto</span>}
+                  </div>
+                ) },
                 { key:'type',   label:'Type',   render:v=><Badge status={v}/> },
                 { key:'supplier', label:'Party', render:(v,r)=><div><div style={{fontWeight:500,color:'var(--text)'}}>{r.supplier?.name||r.project?.name||'—'}</div>{r.supplier?.company&&<div style={{fontSize:11,color:'var(--text-muted)'}}>{r.supplier.company}</div>}</div> },
                 { key:'totalAmount', label:'Amount', render:v=><span style={{fontFamily:'var(--mono)',fontWeight:600,color:'var(--text)'}}>{formatCurrency(v)}</span> },
@@ -219,6 +240,11 @@ export default function Invoices() {
         <Modal isOpen={!!showDetail} onClose={()=>setShowDetail(null)} title={`Invoice ${showDetail?.invoiceNumber}`} size="lg">
           {showDetail&&(
             <div>
+              {showDetail.reconciled && (
+                <div style={{ background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.25)', borderRadius:10, padding:'10px 14px', marginBottom:16, fontSize:13, color:'var(--accent-light)', display:'flex', alignItems:'center', gap:8 }}>
+                  🔄 <strong>Auto-reconciled</strong> — generated automatically when delivery was confirmed
+                </div>
+              )}
               <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
                 {[{l:'Type',v:<Badge status={showDetail.type}/>},{l:'Status',v:<Badge status={showDetail.status}/>},{l:'Created',v:formatDate(showDetail.createdAt)},{l:'Due',v:formatDate(showDetail.dueDate)}].map((item,i)=>(
                   <div key={i} style={{ background:'var(--bg-elevated)', borderRadius:10, padding:12 }}>

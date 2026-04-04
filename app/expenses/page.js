@@ -11,6 +11,14 @@ const categories = ['labor','material','transport','equipment','office','salary'
 const payMethods = ['cash','bank','upi','cheque'];
 const BAR_COLORS = ['var(--accent)','var(--green)','var(--yellow)','var(--purple)','var(--orange)','var(--red)','var(--cyan)','var(--text-muted)'];
 
+function downloadCSV(rows, filename) {
+  const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  Object.assign(document.createElement('a'), { href: url, download: filename }).click();
+  URL.revokeObjectURL(url);
+}
+
 export default function Expenses() {
   const { hasRole } = useAuth();
   const [expenses, setExpenses] = useState([]);
@@ -51,7 +59,15 @@ export default function Expenses() {
   return (
     <Layout>
       <Page title="Finance & Expenses" subtitle={`${expenses.length} records`}
-        actions={hasRole('admin','accountant')&&<Btn icon={<span style={{fontSize:16}}>+</span>} onClick={()=>setShowAdd(true)}>Add Expense</Btn>}>
+        actions={
+          <div style={{ display:'flex', gap:8 }}>
+            <Btn variant="secondary" onClick={()=>downloadCSV([
+              ['Title','Category','Amount','Project','Method','Date','Notes'],
+              ...expenses.map(e=>[e.title, e.category, e.amount, e.project?.name||'—', e.paymentMethod, formatDate(e.date), e.notes||''])
+            ], 'expenses.csv')}>⬇ CSV</Btn>
+            {hasRole('admin','accountant')&&<Btn icon={<span style={{fontSize:16}}>+</span>} onClick={()=>setShowAdd(true)}>Add Expense</Btn>}
+          </div>
+        }>
 
         <div className="grid-4" style={{ marginBottom:24 }}>
           <StatCard title="Total Expenses"  value={formatCurrency(total)}     icon="💰" color="var(--accent)"  delay={1}/>
