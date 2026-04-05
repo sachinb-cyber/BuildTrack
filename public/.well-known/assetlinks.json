@@ -3,6 +3,8 @@
   "target": {
     "namespace": "android_app",
     "package_name": "com.samarthdevelopers.buildtrack",
-    "sha256_cert_fingerprints": ["REPLACE_WITH_YOUR_SHA256_FINGERPRINT"]
+    "sha256_cert_fingerprints": [
+      "B2:DB:39:AF:97:8E:43:9F:17:4F:3C:E5:31:B1:B0:4E:BC:5D:A5:94:16:97:96:B9:4F:54:0B:50:28:12:C8:F3"
+    ]
   }
 }]
