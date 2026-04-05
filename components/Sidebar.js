@@ -16,6 +16,7 @@ const nav = [
   { path:'/geo-capture', label:'Geo Photo',    icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="20" height="20"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> },
   { path:'/deliveries', label:'Deliveries',    icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="20" height="20"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> },
   { path:'/forecast',  label:'AI Forecast',    icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="20" height="20"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> },
+  { path:'/users',     label:'Users',          icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="20" height="20"><circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path d="M10.67 20H14a2 2 0 0 0 2-2v-1a3.33 3.33 0 0 0-1.06-2.43"/><path d="M2 21v-1a4 4 0 0 1 4-4h5"/></svg>, adminOnly:true },
 ];
 
 const typeIcon = { material:'📦', project:'🏗️', invoice:'🧾', worker:'👷', expense:'💰', delivery:'🚚' };
@@ -175,7 +176,7 @@ export default function Sidebar() {
 
         {/* Nav */}
         <nav style={{ flex:1, padding:'8px 10px', overflowY:'auto', overflowX:'hidden' }}>
-          {nav.map(item => {
+          {nav.filter(item => !item.adminOnly || user?.role === 'admin').map(item => {
             const active = item.path==='/' ? pathname==='/' : pathname.startsWith(item.path);
             return (
               <Link key={item.path} href={item.path} style={{ textDecoration:'none' }}>
